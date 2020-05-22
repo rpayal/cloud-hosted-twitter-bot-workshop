@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 
 	// You can prefix imports to make it easier to reference them in your code, like this one
+	twitter_auth "github.com/cloud-hosted-twitter-bot-workshop/pkg/twitter_auth"
 	logr "github.com/sirupsen/logrus"
 )
 
@@ -18,6 +20,7 @@ func main() {
 	// Create the first route handler listening on '/'
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/showjoke", jokeHandler)
+	http.HandleFunc("/tweetjoke", TweetHandler)
 
 	logr.Info("Starting up on 8080")
 
@@ -89,4 +92,34 @@ func getJoke() (string, error) {
 	}
 
 	return string(body), nil
+}
+
+// TweetHandler executes logic to tweet a joke
+func TweetHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	dadJoke, err := getJoke()
+	if err != nil {
+		logr.Error(err)
+		os.Exit(1)
+	}
+	w.Write([]byte(fmt.Sprintf("The following joke will be tweeted, %s\n", dadJoke)))
+
+	// Get twitter credentials from the twitter_auth package
+	creds := twitter_auth.GetCredentials()
+
+	// Build client
+	client, err := twitter_auth.GetUserClient(&creds)
+	if err != nil {
+		logr.Error("Error getting Twitter Client")
+		logr.Error(err)
+	}
+
+	// Tweet the joke by calling the function within client
+	tweet, resp, err := client.Statuses.Update(dadJoke, nil)
+	if err != nil {
+		logr.Error(err)
+	}
+
+	logr.Infof("%+v\n", resp)
+	logr.Infof("%+v\n", tweet)
 }
